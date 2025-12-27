@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   sendCommand,
   getLastCommand,
-} = require("../controllers/deviceController");
+} = require("../controller/deviceController");
 
 
 router.post("/send", sendCommand);

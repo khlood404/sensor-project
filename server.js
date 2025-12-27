@@ -1,39 +1,47 @@
-// server.js
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const morgan = require('morgan');
-require('dotenv').config();
-
-// استدعاء الروتس
-const sensorRoutes = require('./routes/sensorRoutes');
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+require("dotenv").config({ override: true });
 
 const app = express();
 
-// Middlewares
+app.use(express.json());
 app.use(cors());
-app.use(express.json()); // لتفريغ الـ JSON
-app.use(morgan('dev')); // logging للـ requests
 
-// MongoDB connection
-const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/sensorDB';
-mongoose.connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB connected successfully'))
-.catch((err) => console.error('MongoDB connection error:', err));
+const sensorRoutes = require("./routes/sensorRoutes");
+const alertRoutes = require("./routes/alertRoutes");
+const deviceRoutes = require("./routes/deviceRoutes");
+const systemRoutes = require("./routes/systemRoutes");
 
-// Routes
-app.use('/api/sensors', sensorRoutes);
+// Degraded mode: app starts even if MongoDB is unavailable.
+app.locals.dbConnected = false;
 
-// Default route
-app.get('/', (req, res) => {
-    res.send('Sensor API is running');
+// Single connection attempt (no retries). Mongoose v7+ handles internal reconnection.
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
+    app.locals.dbConnected = true;
+    console.log("MongoDB Connected Successfully");
+  })
+  .catch((err) => {
+    app.locals.dbConnected = false;
+    console.error("MongoDB Connection Error:", err && err.message ? err.message : err);
+  });
+
+// middleware to protect DB-dependent routes when DB is down
+function requireDB(req, res, next) {
+  if (app.locals.dbConnected) return next();
+  res.status(503).json({ error: "Service degraded: database unavailable" });
+}
+
+app.use("/sensor", requireDB, sensorRoutes);
+app.use("/alerts", requireDB, alertRoutes);
+app.use("/device", requireDB, deviceRoutes);
+app.use("/system", requireDB, systemRoutes);
+
+// lightweight health endpoint
+app.get('/health', (req, res) => {
+  res.json({ uptime: process.uptime(), dbConnected: !!app.locals.dbConnected });
 });
 
-// Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

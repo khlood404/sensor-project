@@ -17,10 +17,10 @@ const systemStatusSchema = new mongoose.Schema({
     status: String
   },
 
-//   vibration: {
-//     detected: Boolean,
-//     status: String
-//   },
+  vibration: {
+   detected: Boolean,
+   status: String
+ },
 
   detect: {
     detected: Boolean,

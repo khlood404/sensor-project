@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   getAlerts,
   acknowledgeAlert,
-} = require("../controllers/alertController");
+} = require("../controller/alertController");
 
 
 router.get("/", getAlerts);
